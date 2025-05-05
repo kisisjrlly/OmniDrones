@@ -31,6 +31,12 @@ from omni_drones.robots.drone import MultirotorBase
 from omni_drones.views import ArticulationView, RigidPrimView
 from omni_drones.utils.torch import euler_to_quaternion, quat_axis
 
+from omni_drones.controllers import (
+    LeePositionController,
+    AttitudeController,
+    RateController
+)
+
 from tensordict.tensordict import TensorDict, TensorDictBase
 from torchrl.data import UnboundedContinuousTensorSpec, CompositeSpec, DiscreteTensorSpec
 
@@ -171,7 +177,7 @@ class Hover(IsaacEnv):
 
         drone_model_cfg = self.cfg.task.drone_model
         self.drone, self.controller = MultirotorBase.make(
-            drone_model_cfg.name, drone_model_cfg.controller
+            drone_model_cfg.name, drone_model_cfg.controller, self.device
         )
 
         target_vis_prim = prim_utils.create_prim(
@@ -214,11 +220,22 @@ class Hover(IsaacEnv):
                 "intrinsics": self.drone.intrinsics_spec.unsqueeze(0).to(self.device)
             })
         }).expand(self.num_envs).to(self.device)
+        
+        # Adjust action spec based on controller type
+        action_dim = self.drone.action_spec.shape[-1]  # Default action dimension
+        if isinstance(self.controller, LeePositionController):
+            action_dim = 4  # [x, y, z, yaw]
+        elif isinstance(self.controller, AttitudeController):
+            action_dim = 4  # [thrust, yaw_rate, roll, pitch]
+        elif isinstance(self.controller, RateController):
+            action_dim = 4  # [rate_x, rate_y, rate_z, thrust]
+            
         self.action_spec = CompositeSpec({
             "agents": CompositeSpec({
-                "action": self.drone.action_spec.unsqueeze(0),
+                "action": UnboundedContinuousTensorSpec((1, action_dim), device=self.device),
             })
         }).expand(self.num_envs).to(self.device)
+        
         self.reward_spec = CompositeSpec({
             "agents": CompositeSpec({
                 "reward": UnboundedContinuousTensorSpec((1, 1))
@@ -279,8 +296,51 @@ class Hover(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
-        self.effort = self.drone.apply_action(actions)
-
+        
+        # Get current drone state
+        drone_state = self.drone.get_state()[..., :13]
+        
+        # Use the controller to convert high-level actions to rotor commands
+        # Depending on controller type, process the actions accordingly
+        if isinstance(self.controller, LeePositionController):
+            # For position controller: actions are [target_pos, target_yaw]
+            target_pos = actions[..., :3] + self.drone.pos  # Relative position target
+            target_yaw = actions[..., 3:4] * torch.pi  # Scale to radians
+            rotor_commands = self.controller.compute(
+                drone_state, 
+                target_pos=target_pos,
+                target_yaw=target_yaw
+            )
+        elif isinstance(self.controller, AttitudeController):
+            # For attitude controller: actions are [thrust, yaw_rate, roll, pitch]
+            target_thrust = ((actions[..., 0:1] + 1) / 2).clip(0.) * self.controller.max_thrusts.sum(-1)
+            target_yaw_rate = actions[..., 1:2] * torch.pi
+            target_roll = actions[..., 2:3] * torch.pi/4  # Scale to reasonable range
+            target_pitch = actions[..., 3:4] * torch.pi/4  # Scale to reasonable range
+            rotor_commands = self.controller(
+                drone_state,
+                target_thrust=target_thrust,
+                target_yaw_rate=target_yaw_rate,
+                target_roll=target_roll,
+                target_pitch=target_pitch
+            )
+        elif isinstance(self.controller, RateController):
+            # For rate controller: actions are [rate_x, rate_y, rate_z, thrust]
+            target_rate = actions[..., :3] * torch.pi  # Scale to radians
+            target_thrust = ((actions[..., 3:4] + 1) / 2).clip(0.) * self.controller.max_thrusts.sum(-1)
+            rotor_commands = self.controller(
+                drone_state,
+                target_rate=target_rate,
+                target_thrust=target_thrust
+            )
+        else:
+            # Default: pass through actions directly
+            rotor_commands = actions
+        
+        # Handle NaN values
+        torch.nan_to_num_(rotor_commands, 0.)
+        
+        self.effort = self.drone.apply_action(rotor_commands)
     def _compute_state_and_obs(self):
         self.drone_state = self.drone.get_state()
 

@@ -417,9 +417,12 @@ class MultirotorBase(RobotBase):
         drone_cls = MultirotorBase.REGISTRY[drone_model]
         drone = drone_cls()
         from omni_drones.controllers import ControllerBase
-        if controller is not None:
+        if controller is not None and controller != "RotorController":
             controller_cls = ControllerBase.REGISTRY[controller]
             controller = controller_cls(drone.gravity[1], drone.params).to(device)
+        else:
+            # When no controller is specified or it's "RotorController", return None for controller
+            controller = None
         return drone, controller
 
 

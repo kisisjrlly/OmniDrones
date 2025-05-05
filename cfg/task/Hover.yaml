@@ -11,7 +11,10 @@ env:
 
 drone_model:
   name: Firefly
-  controller: LeePositionController
+  # controller: LeePositionController
+  # controller: AttitudeController
+  # controller: RateController
+  controller: RotorController
 
 time_encoding: true
 
