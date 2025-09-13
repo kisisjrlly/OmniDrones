@@ -1422,7 +1422,7 @@ class FormationGateTraversal(IsaacEnv):
         endpoint_exceeded = any_drone_too_far & any_drone_passed_endpoint_x
 
         # terminated = collision_terminated | formation_breakdown | success | out_of_bounds | gate_bypass_failure | endpoint_exceeded
-        terminated = formation_breakdown | success | out_of_bounds | gate_bypass_failure | endpoint_exceeded
+        terminated = success | out_of_bounds | endpoint_exceeded
 
         # ==================== STATS UPDATE ====================
         truncated = self.progress_buf >= self.max_episode_length

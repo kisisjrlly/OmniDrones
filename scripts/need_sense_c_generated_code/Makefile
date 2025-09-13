@@ -30,6 +30,8 @@
 
 
 
+
+
 # define sources and use make's implicit rules to generate object files (*.o)
 
 # model
@@ -134,6 +136,7 @@ ocp_cython_c: ocp_shared_lib
 ocp_cython_o: ocp_cython_c
 	$(CC) $(ACADOS_FLAGS) -c -O2 \
 	-fPIC \
+	-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION \
 	-o acados_ocp_solver_pyx.o \
 	-I $(INCLUDE_PATH)/blasfeo/include/ \
 	-I $(INCLUDE_PATH)/hpipm/include/ \

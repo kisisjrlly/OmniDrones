@@ -373,69 +373,72 @@ void ocp_problem_acados_create_setup_functions(ocp_problem_solver_capsule* capsu
 
     ext_fun_opts.with_global_data = true;
     ext_fun_opts.external_workspace = true;
-    // external cost
-    MAP_CASADI_FNC(ext_cost_0_fun, ocp_problem_cost_ext_cost_0_fun);
-    MAP_CASADI_FNC(ext_cost_0_fun_jac, ocp_problem_cost_ext_cost_0_fun_jac);
-    MAP_CASADI_FNC(ext_cost_0_fun_jac_hess, ocp_problem_cost_ext_cost_0_fun_jac_hess);
-    MAP_CASADI_FNC(ext_cost_0_hess_xu_p, ocp_problem_cost_ext_cost_0_hess_xu_p);
-
-
-
-
-    // discrete dynamics
-    capsule->discr_dyn_phi_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-    for (int i = 0; i < N; i++)
+    if (N > 0)
     {
-        MAP_CASADI_FNC(discr_dyn_phi_fun[i], ocp_problem_dyn_disc_phi_fun);
-    }
+        // external cost
+        MAP_CASADI_FNC(ext_cost_0_fun, ocp_problem_cost_ext_cost_0_fun);
+        MAP_CASADI_FNC(ext_cost_0_fun_jac, ocp_problem_cost_ext_cost_0_fun_jac);
+        MAP_CASADI_FNC(ext_cost_0_fun_jac_hess, ocp_problem_cost_ext_cost_0_fun_jac_hess);
+        MAP_CASADI_FNC(ext_cost_0_hess_xu_p, ocp_problem_cost_ext_cost_0_hess_xu_p);
 
-    capsule->discr_dyn_phi_fun_jac_ut_xt = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-    for (int i = 0; i < N; i++)
-    {
-        MAP_CASADI_FNC(discr_dyn_phi_fun_jac_ut_xt[i], ocp_problem_dyn_disc_phi_fun_jac);
-    }
 
-  
-    capsule->discr_dyn_phi_jac_p_hess_xu_p = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-    for (int i = 0; i < N; i++)
-    {
-        MAP_CASADI_FNC(discr_dyn_phi_jac_p_hess_xu_p[i], ocp_problem_dyn_disc_phi_jac_p_hess_xu_p);
-    }
-  
-
-  
-    capsule->discr_dyn_phi_fun_jac_ut_xt_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-    for (int i = 0; i < N; i++)
-    {
-        MAP_CASADI_FNC(discr_dyn_phi_fun_jac_ut_xt_hess[i], ocp_problem_dyn_disc_phi_fun_jac_hess);
-    }
-    // external cost
-    capsule->ext_cost_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-    for (int i = 0; i < N-1; i++)
-    {
-        MAP_CASADI_FNC(ext_cost_fun[i], ocp_problem_cost_ext_cost_fun);
-    }
-
-    capsule->ext_cost_fun_jac = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-    for (int i = 0; i < N-1; i++)
-    {
-        MAP_CASADI_FNC(ext_cost_fun_jac[i], ocp_problem_cost_ext_cost_fun_jac);
-    }
-
-    capsule->ext_cost_fun_jac_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-    for (int i = 0; i < N-1; i++)
-    {
-        MAP_CASADI_FNC(ext_cost_fun_jac_hess[i], ocp_problem_cost_ext_cost_fun_jac_hess);
-    }
 
     
-    capsule->ext_cost_hess_xu_p = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-    for (int i = 0; i < N-1; i++)
-    {
-        MAP_CASADI_FNC(ext_cost_hess_xu_p[i], ocp_problem_cost_ext_cost_hess_xu_p);
-    }
+        // discrete dynamics
+        capsule->discr_dyn_phi_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        for (int i = 0; i < N; i++)
+        {
+            MAP_CASADI_FNC(discr_dyn_phi_fun[i], ocp_problem_dyn_disc_phi_fun);
+        }
+
+        capsule->discr_dyn_phi_fun_jac_ut_xt = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        for (int i = 0; i < N; i++)
+        {
+            MAP_CASADI_FNC(discr_dyn_phi_fun_jac_ut_xt[i], ocp_problem_dyn_disc_phi_fun_jac);
+        }
 
     
+        capsule->discr_dyn_phi_jac_p_hess_xu_p = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        for (int i = 0; i < N; i++)
+        {
+            MAP_CASADI_FNC(discr_dyn_phi_jac_p_hess_xu_p[i], ocp_problem_dyn_disc_phi_jac_p_hess_xu_p);
+        }
+    
+
+    
+        capsule->discr_dyn_phi_fun_jac_ut_xt_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        for (int i = 0; i < N; i++)
+        {
+            MAP_CASADI_FNC(discr_dyn_phi_fun_jac_ut_xt_hess[i], ocp_problem_dyn_disc_phi_fun_jac_hess);
+        }
+        // external cost
+        capsule->ext_cost_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
+        for (int i = 0; i < N-1; i++)
+        {
+            MAP_CASADI_FNC(ext_cost_fun[i], ocp_problem_cost_ext_cost_fun);
+        }
+
+        capsule->ext_cost_fun_jac = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
+        for (int i = 0; i < N-1; i++)
+        {
+            MAP_CASADI_FNC(ext_cost_fun_jac[i], ocp_problem_cost_ext_cost_fun_jac);
+        }
+
+        capsule->ext_cost_fun_jac_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
+        for (int i = 0; i < N-1; i++)
+        {
+            MAP_CASADI_FNC(ext_cost_fun_jac_hess[i], ocp_problem_cost_ext_cost_fun_jac_hess);
+        }
+
+        
+        capsule->ext_cost_hess_xu_p = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
+        for (int i = 0; i < N-1; i++)
+        {
+            MAP_CASADI_FNC(ext_cost_hess_xu_p[i], ocp_problem_cost_ext_cost_hess_xu_p);
+        }
+
+        
+    } // N > 0
 
 #undef MAP_CASADI_FNC
 }
@@ -583,48 +586,50 @@ void ocp_problem_acados_setup_nlp_in(ocp_problem_solver_capsule* capsule, const 
     double* lbx0 = lubx0;
     double* ubx0 = lubx0 + NBX0;
     // change only the non-zero elements:
-    lbx0[0] = -0.7687100768089294;
-    ubx0[0] = -0.7687100768089294;
-    lbx0[1] = 0.4806603193283081;
-    ubx0[1] = 0.4806603193283081;
-    lbx0[2] = -0.5215718746185303;
-    ubx0[2] = -0.5215718746185303;
-    lbx0[3] = -0.6394777297973633;
-    ubx0[3] = -0.6394777297973633;
-    lbx0[4] = -0.5648282170295715;
-    ubx0[4] = -0.5648282170295715;
-    lbx0[5] = 0.9999998807907104;
-    ubx0[5] = 0.9999998807907104;
-    lbx0[6] = 0.9999998807907104;
-    ubx0[6] = 0.9999998807907104;
-    lbx0[7] = 0.9999998807907104;
-    ubx0[7] = 0.9999998807907104;
-    lbx0[8] = 0.9999998807907104;
-    ubx0[8] = 0.9999998807907104;
-    lbx0[9] = -5.3344268798828125;
-    ubx0[9] = -5.3344268798828125;
-    lbx0[10] = 8.898691177368164;
-    ubx0[10] = 8.898691177368164;
-    lbx0[11] = 1.6356430053710938;
-    ubx0[11] = 1.6356430053710938;
-    lbx0[12] = -1.3464868068695068;
-    ubx0[12] = -1.3464868068695068;
-    lbx0[14] = 0.5;
-    ubx0[14] = 0.5;
-    lbx0[15] = -0.25;
-    ubx0[15] = -0.25;
-    lbx0[16] = -0.7864723205566406;
-    ubx0[16] = -0.7864723205566406;
-    lbx0[17] = 2.8218162059783936;
-    ubx0[17] = 2.8218162059783936;
-    lbx0[18] = 0.4662337899208069;
-    ubx0[18] = 0.4662337899208069;
-    lbx0[19] = 0.9999998807907104;
-    ubx0[19] = 0.9999998807907104;
-    lbx0[20] = 0.9999998807907104;
-    ubx0[20] = 0.9999998807907104;
-    lbx0[21] = -4.839761734008789;
-    ubx0[21] = -4.839761734008789;
+    lbx0[0] = 1;
+    ubx0[0] = 1;
+    lbx0[1] = 1;
+    ubx0[1] = 1;
+    lbx0[2] = 1;
+    ubx0[2] = 1;
+    lbx0[3] = 1;
+    ubx0[3] = 1;
+    lbx0[4] = 1;
+    ubx0[4] = 1;
+    lbx0[5] = 1;
+    ubx0[5] = 1;
+    lbx0[6] = 1;
+    ubx0[6] = 1;
+    lbx0[7] = 1;
+    ubx0[7] = 1;
+    lbx0[8] = 1;
+    ubx0[8] = 1;
+    lbx0[9] = 1;
+    ubx0[9] = 1;
+    lbx0[10] = 1;
+    ubx0[10] = 1;
+    lbx0[11] = 1;
+    ubx0[11] = 1;
+    lbx0[12] = 1;
+    ubx0[12] = 1;
+    lbx0[13] = 1;
+    ubx0[13] = 1;
+    lbx0[14] = 1;
+    ubx0[14] = 1;
+    lbx0[15] = 1;
+    ubx0[15] = 1;
+    lbx0[16] = 1;
+    ubx0[16] = 1;
+    lbx0[17] = 1;
+    ubx0[17] = 1;
+    lbx0[18] = 1;
+    ubx0[18] = 1;
+    lbx0[19] = 1;
+    ubx0[19] = 1;
+    lbx0[20] = 1;
+    ubx0[20] = 1;
+    lbx0[21] = 1;
+    ubx0[21] = 1;
 
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "idxbx", idxbx0);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "lbx", lbx0);
@@ -657,6 +662,10 @@ void ocp_problem_acados_setup_nlp_in(ocp_problem_solver_capsule* capsule, const 
     idxbxe_0[21] = 21;
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "idxbxe", idxbxe_0);
     free(idxbxe_0);
+
+
+
+
 
 
 
@@ -698,6 +707,12 @@ void ocp_problem_acados_setup_nlp_in(ocp_problem_solver_capsule* capsule, const 
 
 
 
+    /* Path constraints */
+
+
+
+
+
 
 
 
@@ -708,6 +723,13 @@ void ocp_problem_acados_setup_nlp_in(ocp_problem_solver_capsule* capsule, const 
 
 
     /* terminal constraints */
+
+
+
+
+
+
+
 
 
 
@@ -829,8 +851,49 @@ static void ocp_problem_acados_create_set_opts(ocp_problem_solver_capsule* capsu
     double adaptive_levenberg_marquardt_mu0 = 0.001;
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "adaptive_levenberg_marquardt_mu0", &adaptive_levenberg_marquardt_mu0);
 
+    double adaptive_levenberg_marquardt_obj_scalar = 2;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "adaptive_levenberg_marquardt_obj_scalar", &adaptive_levenberg_marquardt_obj_scalar);
+
     bool eval_residual_at_max_iter = false;
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "eval_residual_at_max_iter", &eval_residual_at_max_iter);
+
+    // QP scaling
+    double qpscaling_ub_max_abs_eig = 100000;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qpscaling_ub_max_abs_eig", &qpscaling_ub_max_abs_eig);
+
+    double qpscaling_lb_norm_inf_grad_obj = 0.0001;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qpscaling_lb_norm_inf_grad_obj", &qpscaling_lb_norm_inf_grad_obj);
+
+    qpscaling_scale_objective_type qpscaling_scale_objective = NO_OBJECTIVE_SCALING;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qpscaling_scale_objective", &qpscaling_scale_objective);
+
+    ocp_nlp_qpscaling_constraint_type qpscaling_scale_constraints = NO_CONSTRAINT_SCALING;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qpscaling_scale_constraints", &qpscaling_scale_constraints);
+
+    // NLP QP tol strategy
+    ocp_nlp_qp_tol_strategy_t nlp_qp_tol_strategy = FIXED_QP_TOL;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_strategy", &nlp_qp_tol_strategy);
+
+    double nlp_qp_tol_reduction_factor = 0.1;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_reduction_factor", &nlp_qp_tol_reduction_factor);
+
+    double nlp_qp_tol_safety_factor = 0.1;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_safety_factor", &nlp_qp_tol_safety_factor);
+
+    double nlp_qp_tol_min_stat = 0.000000001;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_min_stat", &nlp_qp_tol_min_stat);
+
+    double nlp_qp_tol_min_eq = 0.0000000001;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_min_eq", &nlp_qp_tol_min_eq);
+
+    double nlp_qp_tol_min_ineq = 0.0000000001;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_min_ineq", &nlp_qp_tol_min_ineq);
+
+    double nlp_qp_tol_min_comp = 0.00000000001;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "nlp_qp_tol_min_comp", &nlp_qp_tol_min_comp);
+
+    bool with_anderson_acceleration = false;
+    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "with_anderson_acceleration", &with_anderson_acceleration);
 
     int qp_solver_iter_max = 50;
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qp_iter_max", &qp_solver_iter_max);
@@ -870,27 +933,28 @@ void ocp_problem_acados_set_nlp_out(ocp_problem_solver_capsule* capsule)
     double* x0 = xu0;
 
     // initialize with x0
-    x0[0] = -0.7687100768089294;
-    x0[1] = 0.4806603193283081;
-    x0[2] = -0.5215718746185303;
-    x0[3] = -0.6394777297973633;
-    x0[4] = -0.5648282170295715;
-    x0[5] = 0.9999998807907104;
-    x0[6] = 0.9999998807907104;
-    x0[7] = 0.9999998807907104;
-    x0[8] = 0.9999998807907104;
-    x0[9] = -5.3344268798828125;
-    x0[10] = 8.898691177368164;
-    x0[11] = 1.6356430053710938;
-    x0[12] = -1.3464868068695068;
-    x0[14] = 0.5;
-    x0[15] = -0.25;
-    x0[16] = -0.7864723205566406;
-    x0[17] = 2.8218162059783936;
-    x0[18] = 0.4662337899208069;
-    x0[19] = 0.9999998807907104;
-    x0[20] = 0.9999998807907104;
-    x0[21] = -4.839761734008789;
+    x0[0] = 1;
+    x0[1] = 1;
+    x0[2] = 1;
+    x0[3] = 1;
+    x0[4] = 1;
+    x0[5] = 1;
+    x0[6] = 1;
+    x0[7] = 1;
+    x0[8] = 1;
+    x0[9] = 1;
+    x0[10] = 1;
+    x0[11] = 1;
+    x0[12] = 1;
+    x0[13] = 1;
+    x0[14] = 1;
+    x0[15] = 1;
+    x0[16] = 1;
+    x0[17] = 1;
+    x0[18] = 1;
+    x0[19] = 1;
+    x0[20] = 1;
+    x0[21] = 1;
 
 
     double* u0 = xu0 + NX;
@@ -1336,7 +1400,13 @@ void ocp_problem_acados_print_stats(ocp_problem_solver_capsule* capsule)
     ocp_nlp_get(capsule->nlp_solver, "stat_m", &stat_m);
 
 
-    double stat[1200];
+    int stat_n_max = 16;
+    if (stat_n > stat_n_max)
+    {
+        printf("stat_n_max = %d is too small, increase it in the template!\n", stat_n_max);
+        exit(1);
+    }
+    double stat[1600];
     ocp_nlp_get(capsule->nlp_solver, "statistics", stat);
 
     int nrow = nlp_iter+1 < stat_m ? nlp_iter+1 : stat_m;
