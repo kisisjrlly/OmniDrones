@@ -1,0 +1,1 @@
+TORCH_LOGS=not_implemented python -u test_mpc.py task=Platform/PlatformHover algo=mpc_mappo > res-test-mpc.log 2>&1
