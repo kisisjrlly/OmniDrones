@@ -32,6 +32,10 @@ from typing import Iterator
 
 class SyncDataCollector(_SyncDataCollector):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._fps = None  # Initialize fps to None until first rollout
+
     def rollout(self) -> TensorDictBase:
         start = time.perf_counter()
         _tensordict_out = super().rollout()

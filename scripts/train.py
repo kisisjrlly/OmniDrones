@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import threading
 
 import hydra
 import torch
@@ -37,15 +38,22 @@ def main(cfg):
     OmegaConf.register_new_resolver("eval", eval)
     OmegaConf.resolve(cfg)
     OmegaConf.set_struct(cfg, False)
+
+    print("-------------------------------")
+    print("Cfgs:",OmegaConf.to_yaml(cfg, resolve=True))
+    print("-------------------------------")
+
     simulation_app = init_simulation_app(cfg)
     run = init_wandb(cfg)
     setproctitle(run.name)
     print(OmegaConf.to_yaml(cfg))
 
     from omni_drones.envs.isaac_env import IsaacEnv
-
+    print("Available environments:", IsaacEnv.REGISTRY.keys())
     env_class = IsaacEnv.REGISTRY[cfg.task.name]
     base_env = env_class(cfg, headless=cfg.headless)
+    # propagate env.num_envs into algo.num_envs so algorithms know how many envs to expect
+    cfg.algo.num_envs = getattr(base_env, "num_envs", 1)
 
     transforms = [InitTracker()]
 
@@ -83,8 +91,18 @@ def main(cfg):
             env.reward_spec,
             device=base_env.device
         )
-    except KeyError:
-        raise NotImplementedError(f"Unknown algorithm: {cfg.algo.name}")
+        checkpoint_path = cfg.get("checkpoint_path", None)
+        if checkpoint_path and os.path.isfile(checkpoint_path):
+            print(f"Loading checkpoint from {checkpoint_path}")
+            checkpoint = torch.load(checkpoint_path, map_location=base_env.device)
+            policy.load_state_dict(checkpoint)
+            print("Checkpoint loaded successfully.")
+        else:
+            print("No checkpoint found, starting training from scratch.")
+    except Exception as e:
+        raise NotImplementedError(f"Algorithm: {cfg.algo.name} has error ({e})")
+
+    # run.watch(policy, log="all",log_freq=128)
 
     frames_per_batch = env.num_envs * int(cfg.algo.train_every)
     total_frames = cfg.get("total_frames", -1) // frames_per_batch * frames_per_batch
@@ -164,7 +182,8 @@ def main(cfg):
         return info
 
     pbar = tqdm(collector, total=total_frames//frames_per_batch)
-    env.train()
+    # env.train()
+    env.eval()
     for i, data in enumerate(pbar):
         info = {"env_frames": collector._frames, "rollout_fps": collector._fps}
         episode_stats.add(data.to_tensordict())
@@ -175,22 +194,20 @@ def main(cfg):
                 for k, v in episode_stats.pop().items(True, True)
             }
             info.update(stats)
-
+        env.train()
         info.update(policy.train_op(data.to_tensordict()))
+        env.eval()
 
         if eval_interval > 0 and i % eval_interval == 0:
             logging.info(f"Eval at {collector._frames} steps.")
             info.update(evaluate())
-            env.train()
-            base_env.train()
+            # env.train()
+            # base_env.train()
 
         if save_interval > 0 and i % save_interval == 0:
-            try:
-                ckpt_path = os.path.join(run.dir, f"checkpoint_{collector._frames}.pt")
-                torch.save(policy.state_dict(), ckpt_path)
-                logging.info(f"Saved checkpoint to {str(ckpt_path)}")
-            except AttributeError:
-                logging.warning(f"Policy {policy} does not implement `.state_dict()`")
+            ckpt_path = os.path.join(run.dir, f"checkpoint_{collector._frames}.pt")
+            torch.save(policy.state_dict(), ckpt_path)
+            logging.info(f"Saved checkpoint to {str(ckpt_path)}")
 
         run.log(info)
         print(OmegaConf.to_yaml({k: v for k, v in info.items() if isinstance(v, float)}))

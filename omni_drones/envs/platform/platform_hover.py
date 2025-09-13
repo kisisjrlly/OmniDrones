@@ -41,7 +41,11 @@ from omni_drones.utils.torch import euler_to_quaternion
 
 from .utils import OveractuatedPlatform, PlatformCfg
 
-
+from omni_drones.controllers import (
+    LeePositionController,
+    AttitudeController,
+    RateController
+)
 
 class PlatformHover(IsaacEnv):
     r"""
@@ -135,7 +139,7 @@ class PlatformHover(IsaacEnv):
     def _design_scene(self):
         drone_model_cfg = self.cfg.task.drone_model
         self.drone, self.controller = MultirotorBase.make(
-            drone_model_cfg.name, drone_model_cfg.controller
+            drone_model_cfg.name, drone_model_cfg.controller, self.device
         )
 
         platform_cfg = PlatformCfg(
@@ -170,12 +174,12 @@ class PlatformHover(IsaacEnv):
             frame_state_dim += self.time_encoding_dim
 
         observation_spec = CompositeSpec({
-            "obs_self": UnboundedContinuousTensorSpec((1, drone_state_dim + self.drone.n)),
+            "obs_self": UnboundedContinuousTensorSpec((1, drone_state_dim + 3 +self.drone.n)),
             "obs_others": UnboundedContinuousTensorSpec((self.drone.n-1, 13)),
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
         }).to(self.device)
         observation_central_spec = CompositeSpec({
-            "state_drones": UnboundedContinuousTensorSpec((self.drone.n, drone_state_dim + self.drone.n)),
+            "state_drones": UnboundedContinuousTensorSpec((self.drone.n, drone_state_dim + 3 + self.drone.n)),
             "state_frame": UnboundedContinuousTensorSpec((1, frame_state_dim)),
         }).to(self.device)
         self.observation_spec = CompositeSpec({
@@ -250,6 +254,54 @@ class PlatformHover(IsaacEnv):
 
     def _pre_sim_step(self, tensordict: TensorDictBase):
         actions = tensordict[("agents", "action")]
+        # print("actions:", actions)
+        # Store actions for stats calculations
+        self.actions = actions.clone()
+        # self._update_gate_dynamics()
+
+        # Get current drone state
+        drone_state = self.drone.get_state()[..., :13]
+        
+        # Use the controller to convert high-level actions to rotor commands
+        # Depending on controller type, process the actions accordingly
+        if isinstance(self.controller, LeePositionController):
+            # For position controller: actions are [target_pos, target_yaw]
+            current_pos, _ = self.drone.get_world_poses()
+            target_pos = actions[..., :3] + current_pos  # Relative position target
+            target_yaw = actions[..., 3:4] * torch.pi  # Scale to radians
+            rotor_commands = self.controller.compute(
+                drone_state, 
+                target_pos=target_pos,
+                target_yaw=target_yaw
+            )
+        elif isinstance(self.controller, AttitudeController):
+            # For attitude controller: actions are [thrust, yaw_rate, roll, pitch]
+            target_thrust = ((actions[..., 0:1] + 1) / 2).clip(0.) * self.controller.max_thrusts.sum(-1)
+            target_yaw_rate = actions[..., 1:2] * torch.pi
+            target_roll = actions[..., 2:3] * torch.pi/4  # Scale to reasonable range
+            target_pitch = actions[..., 3:4] * torch.pi/4  # Scale to reasonable range
+            rotor_commands = self.controller(
+                drone_state,
+                target_thrust=target_thrust,
+                target_yaw_rate=target_yaw_rate,
+                target_roll=target_roll,
+                target_pitch=target_pitch
+            )
+        elif isinstance(self.controller, RateController):
+            # For rate controller: actions are [rate_x, rate_y, rate_z, thrust]
+            target_rate = actions[..., :3] * torch.pi  # Scale to radians
+            target_thrust = ((actions[..., 3:4] + 1) / 2).clip(0.) * self.controller.max_thrusts.sum(-1)
+            rotor_commands = self.controller(
+                drone_state,
+                target_rate=target_rate,
+                target_thrust=target_thrust
+            )
+        else:
+            # Default: pass through actions directly
+            rotor_commands = actions
+        
+        # Handle NaN values
+        torch.nan_to_num_(rotor_commands, 0.)
         self.effort = self.drone.apply_action(actions)
 
     def _compute_state_and_obs(self):
@@ -286,8 +338,15 @@ class PlatformHover(IsaacEnv):
         identity = torch.eye(self.drone.n, device=self.device).expand(self.num_envs, -1, -1)
 
         obs = TensorDict({}, [self.num_envs, self.drone.n])
+        # obs["obs_self"] = torch.cat(
+        #     [-platform_drone_rpos, self.drone_states[..., 3:], identity], dim=-1
+        # ).unsqueeze(2)
+
+        # print("self.drone_states.shape:", self.drone_states.shape)
+        # print("self.platform.pos.shape:", self.platform.pos.shape)
+        # print("identity.shape:", identity.shape)
         obs["obs_self"] = torch.cat(
-            [-platform_drone_rpos, self.drone_states[..., 3:], identity], dim=-1
+            [self.drone_states, -platform_drone_rpos, identity], dim=-1
         ).unsqueeze(2)
         obs["obs_others"] = torch.cat(
             [self.drone_rpos, vmap(others)(self.drone_states[..., 3:13])], dim=-1
@@ -366,3 +425,52 @@ class PlatformHover(IsaacEnv):
             },
             self.batch_size,
         )
+
+
+# 完整obs["agents"]["observation"]展平后的字段注释（98维）
+# 展平顺序：obs_self -> obs_others -> state_frame
+#
+# === obs_self 部分 (30维) ===
+# [0:23]  : 无人机完整状态 (drone_state_dim = self.drone.state_spec.shape.numel()，通常为23)
+#           - [0:3]   位置 [px, py, pz]
+#           - [3:7]   四元数姿态 [qw, qx, qy, qz]
+#           - [7:10]  线速度 [vx, vy, vz]
+#           - [10:13] 角速度 [wx, wy, wz]
+#           - [13:16] 航向向量 [hx, hy, hz]
+#           - [16:19] 向上向量 [ux, uy, uz]
+#           - [19:23] 其它无人机状态字段（与具体无人机模型相关，4维）
+# [23:26] : 平台中心位置 [platform_px, platform_py, platform_pz]
+# [26:30] : 无人机身份编码 (one-hot, 4维)
+#
+# === obs_others 部分 (3×13=39维) ===
+# 其他3个无人机的观测信息，每个13维（按顺序展平）
+# [30:43]  : 其他无人机1的信息 [relative_pos(3), drone_state[3:13](10)]
+#           - [30:33]  与当前无人机的相对位置 [rel_px, rel_py, rel_pz]
+#           - [33:43]  其他无人机状态片段 [qw, qx, qy, qz, vx, vy, vz, wx, wy, wz]
+# [43:56]  : 其他无人机2的信息（结构同上）
+# [56:69]  : 其他无人机3的信息（结构同上）
+#
+# === state_frame 部分 (29维) ===
+# [69:98]  : 平台状态信息 (29维)
+#           根据代码：target_platform_rpose (9) + platform_state[3:] (16) + time_encoding (4) = 29
+#           - [69:78]  目标平台相对姿态 target_platform_rpose (9维)
+#             - [69:72] 目标相对位置 [target_rel_px, target_rel_py, target_rel_pz]
+#             - [72:75] 目标相对航向 [target_rel_hx, target_rel_hy, target_rel_hz]
+#             - [75:78] 目标相对向上 [target_rel_ux, target_rel_uy, target_rel_uz]
+#           - [78:94]  平台状态 platform_state[3:] (16维)
+#             - [78:82] 平台四元数 [platform_qw, platform_qx, platform_qy, platform_qz]
+#             - [82:85] 平台线速度 [platform_vx, platform_vy, platform_vz]
+#             - [85:88] 平台角速度 [platform_wx, platform_wy, platform_wz]
+#             - [88:91] 平台航向向量 [platform_hx, platform_hy, platform_hz]
+#             - [91:94] 平台向上向量 [platform_ux, platform_uy, platform_uz]
+#           - [94:98]  时间编码 time_encoding (4维)
+#             - [94]    归一化时间进度 t = progress_buf / max_episode_length
+#             - [95]    sin(2πt)
+#             - [96]    cos(2πt)
+#             - [97]    sin(4πt)
+#
+# 总维度验证：30 + 39 + 29 = 98 ✓
+# 说明：drone_state_dim 在代码中由 self.drone.state_spec.shape.numel() 决定（参见 `_set_specs`），
+# 若无人机模型变更，请同步更新此注释。
+# 参见实现：[`PlatformHover._set_specs`](OmniDrones/omni_drones/envs/platform/platform_hover.py)，
+# 无人机模型定义：[`MultirotorBase` 在 OmniDrones/omni_drones/robots/drone.py](OmniDrones/omni_drones/robots/drone.py).

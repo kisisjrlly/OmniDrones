@@ -11,7 +11,7 @@ env:
   max_episode_length: 600
 
 drone_model:
-  name: Hummingbird
+  name: Iris
   controller: LeePositionController
 
 time_encoding: true
@@ -19,6 +19,7 @@ time_encoding: true
 safe_distance: 0.4
 formation: hexagon # tetragon
 
-ravel_obs_central: false
+ravel_obs: true
+ravel_obs_central: true
 
 action_transform: null

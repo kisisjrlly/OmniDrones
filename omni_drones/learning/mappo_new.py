@@ -24,6 +24,7 @@
 This is a more concise and readable implementation of MAPPO using TorchRL.
 """
 
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -109,7 +110,7 @@ class EnsembleModule(_EnsembleModule):
         params_td = make_functional(module).expand(num_copies).to_tensordict()
         self.module = module
         self.vmapped_forward = vmap(self.module, (1, 0), 1)
-        self.reset_parameters_recursive(params_td)
+        # self.reset_parameters_recursive(params_td)
         self.params_td = TensorDictParams(params_td)
 
     def forward(self, tensordict: TensorDict):
@@ -150,16 +151,20 @@ class MAPPO:
 
         actor_module = TensorDictModule(
             nn.Sequential(
-                make_mlp([256, 256], nn.Mish),
+                make_mlp([256, 512, 256, 128, 64], nn.Mish),
                 Actor(self.action_dim)
             ),
             [("agents", "observation")], ["loc", "scale"]
         ).to(self.device)
-        actor_module(fake_input)
+        print("fake_input:", fake_input)
+        print("actor_module output of fake output:", actor_module(fake_input))
+        print("actor_module:", actor_module)
 
         if not cfg.share_actor:
+            print("sharing actor across agents")
             actor_module = EnsembleModule(actor_module, self.num_agents)
         else:
+            print("using separate actor for each agent")
             actor_module.apply(init_)
 
         self.actor = ProbabilisticActor(
@@ -172,7 +177,7 @@ class MAPPO:
 
         self.critic = TensorDictModule(
             nn.Sequential(
-                make_mlp([512, 256], nn.Mish),
+                make_mlp([512, 256, 128, 64], nn.Mish),
                 nn.LazyLinear(self.num_agents),
                 Rearrange("... -> ... 1")
             ),
@@ -186,11 +191,15 @@ class MAPPO:
         self.value_norm = ValueNorm1(input_shape=1).to(self.device)
 
     def __call__(self, tensordict: TensorDict):
+        # print("tensordict in call:", tensordict)
+        start_time = time.time()
         tensordict.update(self.actor(tensordict))
         self.critic(tensordict)
+        # print("Actor and critic forward pass time:", time.time() - start_time)
         return tensordict
 
     def train_op(self, tensordict: TensorDict):
+        # print("tensordict in train_op:", tensordict)
         next_tensordict = tensordict["next"]
         with torch.no_grad():
             next_values = self.critic(next_tensordict)["state_value"]
@@ -215,7 +224,9 @@ class MAPPO:
         for epoch in range(self.cfg.ppo_epochs):
             batch = make_batch(tensordict, self.cfg.num_minibatches)
             for minibatch in batch:
+                start_time = time.time()
                 infos.append(self._update(minibatch))
+                # print("Update time for epoch {}: {:.4f}s".format(epoch, time.time() - start_time))
 
         infos: TensorDict = torch.stack(infos).to_tensordict()
         infos = infos.apply(torch.mean, batch_size=[])
@@ -261,6 +272,63 @@ class MAPPO:
             "critic_grad_norm": critic_grad_norm,
             "explained_var": explained_var
         }, [])
+    
+
+    def state_dict(self):
+        """Return state dictionary for saving checkpoints."""
+        state_dict = {
+            "actor": self.actor.state_dict(),
+            "critic": self.critic.state_dict(),
+            "actor_opt": self.actor_opt.state_dict(),
+            "critic_opt": self.critic_opt.state_dict(),
+            "value_norm": self.value_norm.state_dict(),
+            # Add metadata
+            "num_agents": self.num_agents,
+            "action_dim": self.action_dim,
+            "entropy_coef": self.entropy_coef,
+            "clip_param": self.clip_param,
+        }
+        return state_dict
+
+    def load_state_dict(self, state_dict):
+        """Load state dictionary from checkpoint."""
+        # Verify compatibility
+        if "num_agents" in state_dict and state_dict["num_agents"] != self.num_agents:
+            raise ValueError(f"Number of agents mismatch: expected {self.num_agents}, got {state_dict['num_agents']}")
+        if "action_dim" in state_dict and state_dict["action_dim"] != self.action_dim:
+            raise ValueError(f"Action dimension mismatch: expected {self.action_dim}, got {state_dict['action_dim']}")
+        
+        # Load model states
+        self.actor.load_state_dict(state_dict["actor"])
+        self.critic.load_state_dict(state_dict["critic"])
+        self.actor_opt.load_state_dict(state_dict["actor_opt"])
+        self.critic_opt.load_state_dict(state_dict["critic_opt"])
+        self.value_norm.load_state_dict(state_dict["value_norm"])
+        
+        # Load hyperparameters if present
+        if "entropy_coef" in state_dict:
+            self.entropy_coef = state_dict["entropy_coef"]
+        if "clip_param" in state_dict:
+            self.clip_param = state_dict["clip_param"]
+
+    def save_checkpoint(self, filepath):
+        """Save complete checkpoint to file."""
+        checkpoint = {
+            "model_state_dict": self.state_dict(),
+            "timestamp": time.time(),
+        }
+        torch.save(checkpoint, filepath)
+        print(f"Checkpoint saved to {filepath}")
+
+    def load_checkpoint(self, filepath):
+        """Load complete checkpoint from file."""
+        checkpoint = torch.load(filepath, map_location=self.device)
+        self.load_state_dict(checkpoint["model_state_dict"])
+        print(f"Checkpoint loaded from {filepath}")
+        if "timestamp" in checkpoint:
+            import datetime
+            timestamp = datetime.datetime.fromtimestamp(checkpoint["timestamp"])
+            print(f"Checkpoint created at: {timestamp}")
 
 
 def make_batch(tensordict: TensorDict, num_minibatches: int):

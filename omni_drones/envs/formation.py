@@ -205,6 +205,8 @@ class Formation(IsaacEnv):
         self.drone.set_world_poses(pos, rot, env_ids)
         self.drone.set_velocities(vel, env_ids)
 
+        print("pos shape is:", pos.shape)
+        print("self.formation shape is:", self.formation.shape)
         self.last_cost_h[env_ids] = vmap(cost_formation_hausdorff)(
             pos, desired_p=self.formation
         )
@@ -346,7 +348,7 @@ def laplacian(p: torch.Tensor, normalize=False):
         L = D - A
     return L
 
-@vmap
+# @vmap
 def cost_formation_hausdorff(p: torch.Tensor, desired_p: torch.Tensor) -> torch.Tensor:
     p = p - p.mean(-2, keepdim=True)
     desired_p = desired_p - desired_p.mean(-2, keepdim=True)

@@ -4,20 +4,29 @@ hydra:
     # see https://hydra.cc/docs/advanced/search_path/
     - file://../cfg
 
-headless: true
+headless: false
 
 sim: ${task.sim}
 env: ${task.env}
 
-total_frames: 150_000_000
+total_frames: 150_000_000_0
 max_iters: -1
 eval_interval: -1
-save_interval: -1
+save_interval: 100
 seed: 0
 
+
+# checkpoint_path: "/tmp/checkpoint_final.pt"
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250609_140641-tasaww90/files/checkpoint_6619136.pt
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250610_112659-jwg8bmnb/files/checkpoint_39387136.pt
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250611_162556-tuq9dm4x/files/checkpoint_final.pt
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250901_102743-c86t60ue/files/checkpoint_9863168.pt
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250901_225024-c5y2joqs/files/checkpoint_32800768.pt
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250902_175845-c9vtdwjl/files/checkpoint_22970368.pt
+# checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250909_204627-ax1gmuvu/files/checkpoint_13139968.pt
 viewer:
   resolution: [960, 720]
-  eye: [8, 0., 6.]
+  eye: [10, 0., 8.]
   lookat: [0., 0., 1.]
 
 wandb:
@@ -25,8 +34,9 @@ wandb:
   run_name: ${oc.select:..task.name,test}-${oc.select:..algo.name,none}
   job_type: train
   entity:
-  project: omnidrones
+  project: mappo-mpc
   mode: online # set to 'disabled' when debugging locally
+  # mode: disabled
   run_id:
   monitor_gym: True
   tags:

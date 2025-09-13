@@ -83,4 +83,6 @@ def init_wandb(cfg):
     run = wandb.init(**kwargs)
     cfg_dict = dict_flatten(OmegaConf.to_container(cfg))
     run.config.update(cfg_dict)
+    wandb.run.log_code("../", include_fn=lambda path: path.endswith('.py')
+                    or path.endswith('.yaml') or path.endswith('.sh'))
     return run

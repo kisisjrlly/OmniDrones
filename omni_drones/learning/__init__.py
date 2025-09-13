@@ -21,8 +21,9 @@
 # SOFTWARE.
 
 
-from .mappo import MAPPOPolicy
+# from .mappo import MAPPOPolicy
 from .mappo_new import MAPPO
+from .mpc_mappo import MPCMAPPO
 from .ppo import *
 from .happo import HAPPOPolicy
 from .qmix import QMIXPolicy
@@ -34,8 +35,9 @@ from .matd3 import MATD3Policy
 from .tdmpc import TDMPCPolicy
 
 ALGOS = {
-    "mappo_old": MAPPOPolicy,
+    # "mappo_old": MAPPOPolicy,
     "mappo": MAPPO,
+    "mpc_mappo": MPCMAPPO,
     "happo": HAPPOPolicy,
     "ppo": PPOPolicy,
     "ppo_rnn": PPORNNPolicy,

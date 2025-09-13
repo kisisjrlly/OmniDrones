@@ -21,19 +21,23 @@
 # SOFTWARE.
 
 
-from .single import Hover, Track, FlyThrough
-from .payload import PayloadHover, PayloadTrack, PayloadFlyThrough
-from .inv_pendulum import InvPendulumHover, InvPendulumTrack, InvPendulumFlyThrough
-from .dragon import DragonHover
-from .platform import PlatformHover, PlatformTrack, PlatformFlyThrough
-from .transport import TransportHover, TransportTrack, TransportFlyThrough
-from .formation import Formation
-from .rearrange import Rearrange
-from .isaac_env import IsaacEnv
-
 try:
+    from .single import Hover, Track, FlyThrough
+    from .payload import PayloadHover, PayloadTrack, PayloadFlyThrough
+    from .inv_pendulum import InvPendulumHover, InvPendulumTrack, InvPendulumFlyThrough
+    from .dragon import DragonHover
+    from .platform import PlatformHover, PlatformTrack, PlatformFlyThrough
+    from .transport import TransportHover, TransportTrack, TransportFlyThrough
+    from .formation import Formation
+    from .formation_gate_traversal import FormationGateTraversal
+    from .rearrange import Rearrange
+    from .isaac_env import IsaacEnv
     from .single import Forest, Pinball
-except ModuleNotFoundError:
+except Exception as e:
+    print(
+        "Failed to import envs "
+        "Please ensure that you have installed the required dependencies:",e
+    )
     print(
         "To run the environments which use `ContactSensor` and `RayCaster`,"
         "please install Isaac Lab (https://github.com/isaac-sim/IsaacLab)."
