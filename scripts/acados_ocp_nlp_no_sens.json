@@ -1,7 +1,7 @@
 {
-    "acados_include_path": "/home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/acados/include",
-    "acados_lib_path": "/home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/acados/lib",
-    "code_export_directory": "/home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/no_need_sense_c_generated_code",
+    "acados_include_path": "/home/siclab/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/acados/include",
+    "acados_lib_path": "/home/siclab/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/acados/lib",
+    "code_export_directory": "/home/siclab/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/no_need_sense_c_generated_code",
     "constraints": {
         "C": [],
         "C_e": [],
@@ -66,6 +66,9 @@
             20,
             21
         ],
+        "idxs_rev": [],
+        "idxs_rev_0": [],
+        "idxs_rev_e": [],
         "idxsbu": [],
         "idxsbx": [],
         "idxsbx_e": [],
@@ -117,6 +120,9 @@
         "lphi": [],
         "lphi_0": [],
         "lphi_e": [],
+        "ls": [],
+        "ls_0": [],
+        "ls_e": [],
         "lsbu": [],
         "lsbx": [],
         "lsbx_e": [],
@@ -168,6 +174,9 @@
         "uphi": [],
         "uphi_0": [],
         "uphi_e": [],
+        "us": [],
+        "us_0": [],
+        "us_e": [],
         "usbu": [],
         "usbx": [],
         "usbx_e": [],
@@ -220,8 +229,8 @@
         "zu_e": []
     },
     "cython_include_dirs": [
-        "/home/zhaoguodong/.local/share/ov/pkg/isaac-sim-4.0.0/kit/exts/omni.kit.pip_archive/pip_prebundle/numpy/core/include",
-        "/home/zhaoguodong/miniconda3/envs/sim/include/python3.10"
+        "/home/siclab/miniconda3/envs/sim-zgd/lib/python3.10/site-packages/numpy/core/include",
+        "/home/siclab/miniconda3/envs/sim-zgd/include/python3.10"
     ],
     "dims": {
         "N": 5,
@@ -1054,9 +1063,11 @@
         "adaptive_levenberg_marquardt_lam": 5.0,
         "adaptive_levenberg_marquardt_mu0": 0.001,
         "adaptive_levenberg_marquardt_mu_min": 1e-16,
+        "adaptive_levenberg_marquardt_obj_scalar": 2.0,
         "allow_direction_mode_switch_to_nominal": true,
         "as_rti_iter": 1,
         "as_rti_level": 4,
+        "byrd_omojokon_slack_relaxation_factor": 1.00001,
         "collocation_type": "GAUSS_LEGENDRE",
         "cost_discretization": "EULER",
         "cost_scaling": [
@@ -1105,6 +1116,13 @@
         "log_primal_step_norm": false,
         "model_external_shared_lib_dir": null,
         "model_external_shared_lib_name": null,
+        "nlp_qp_tol_min_comp": 1e-11,
+        "nlp_qp_tol_min_eq": 1e-10,
+        "nlp_qp_tol_min_ineq": 1e-10,
+        "nlp_qp_tol_min_stat": 1e-09,
+        "nlp_qp_tol_reduction_factor": 0.1,
+        "nlp_qp_tol_safety_factor": 0.1,
+        "nlp_qp_tol_strategy": "FIXED_QP_TOL",
         "nlp_solver_ext_qp_res": 0,
         "nlp_solver_max_iter": 100,
         "nlp_solver_tol_comp": 0.001,
@@ -1130,6 +1148,10 @@
         "qp_solver_tol_ineq": null,
         "qp_solver_tol_stat": null,
         "qp_solver_warm_start": 0,
+        "qpscaling_lb_norm_inf_grad_obj": 0.0001,
+        "qpscaling_scale_constraints": "NO_CONSTRAINT_SCALING",
+        "qpscaling_scale_objective": "NO_OBJECTIVE_SCALING",
+        "qpscaling_ub_max_abs_eig": 100000.0,
         "reg_adaptive_eps": false,
         "reg_epsilon": 0.0001,
         "reg_max_cond_block": 10000000.0,
@@ -1184,6 +1206,7 @@
         "timeout_max_time": 0.0,
         "use_constraint_hessian_in_feas_qp": false,
         "with_adaptive_levenberg_marquardt": false,
+        "with_anderson_acceleration": false,
         "with_batch_functionality": true,
         "with_solution_sens_wrt_params": false,
         "with_value_sens_wrt_params": false

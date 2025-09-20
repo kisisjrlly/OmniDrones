@@ -176,6 +176,7 @@ class FormationGateTraversal(IsaacEnv):
         # self.survival_reward_weight = cfg.task.survival_reward_weight
         # self.effort_reward_weight = cfg.task.effort_reward_weight
         self.formation_reward_weight = cfg.task.formation_reward_weight
+        self.formation_cohesion_weight = cfg.task.formation_cohesion_weight
         self.gate_reward_weight = cfg.task.gate_reward_weight
         self.endpoint_progress_reward_weight = cfg.task.endpoint_progress_reward_weight
         
@@ -235,6 +236,7 @@ class FormationGateTraversal(IsaacEnv):
         
         # Reward tracking
         self.last_formation_error = torch.zeros(self.num_envs, device=self.device)
+        # 修改为存储所有无人机到门的距离和（而非编队中心到门的距离）
         self.last_gate_distance = torch.zeros(self.num_envs, device=self.device)
         # Change to track individual drone distances to endpoints
         self.last_endpoint_distances = torch.zeros(self.num_envs, self.drone.n, device=self.device)
@@ -512,8 +514,8 @@ class FormationGateTraversal(IsaacEnv):
             "reward_endpoint_progress": UnboundedContinuousTensorSpec(1),
             
             # Safety reward components
-            "reward_collision_penalty": UnboundedContinuousTensorSpec(1),
-            "reward_soft_collision_penalty": UnboundedContinuousTensorSpec(1),
+            # "reward_collision_penalty": UnboundedContinuousTensorSpec(1),
+            # "reward_soft_collision_penalty": UnboundedContinuousTensorSpec(1),
             
             # Task completion reward components
             "reward_completion": UnboundedContinuousTensorSpec(1),
@@ -597,13 +599,15 @@ class FormationGateTraversal(IsaacEnv):
         drone_pos, _ = self.drone.get_world_poses()
         formation_center = drone_pos.mean(dim=1)  # [num_envs, 3]
         
-        # Initialize gate distance to first gate for each environment - 张量化版本
+        # Initialize gate distance sum to first gate for each environment - 修改为所有无人机距离和
 
         # 获取所有重置环境的第一个门位置 [len(env_ids), 3]
         first_gate_positions = self.gate_positions[env_ids, 0]  
-        # 计算对应环境的编队中心到第一个门的距离 [len(env_ids)]
-        gate_distances = torch.norm(formation_center[env_ids] - first_gate_positions, dim=-1)
-        self.last_gate_distance[env_ids] = gate_distances
+        # 计算每个无人机到第一个门的距离 [len(env_ids), n_drones]
+        individual_gate_distances = torch.norm(drone_pos[env_ids] - first_gate_positions.unsqueeze(1), dim=-1)
+        # 计算所有无人机到门距离的总和 [len(env_ids)]
+        gate_distance_sums = individual_gate_distances.sum(dim=-1)
+        self.last_gate_distance[env_ids] = gate_distance_sums
 
         
         # Initialize endpoint distances - 张量化版本，计算每个无人机到对应终点的距离
@@ -628,8 +632,8 @@ class FormationGateTraversal(IsaacEnv):
         self.stats["reward_cohesion"][env_ids] = 0
         
         # Safety reward components
-        self.stats["reward_collision_penalty"][env_ids] = 0
-        self.stats["reward_soft_collision_penalty"][env_ids] = 0
+        # self.stats["reward_collision_penalty"][env_ids] = 0
+        # self.stats["reward_soft_collision_penalty"][env_ids] = 0
         
         # Task completion reward components
         self.stats["reward_completion"][env_ids] = 0
@@ -1138,6 +1142,7 @@ class FormationGateTraversal(IsaacEnv):
         # 1.5 Action smoothness reward
         action_diff = torch.norm(self.actions - self.prev_actions, dim=-1)
         reward_action_smoothness = torch.exp(-action_diff.mean(dim=-1)) * self.reward_action_smoothness_weight
+        # reward_action_smoothness = - action_diff * self.reward_action_smoothness_weight
         
         # 2. Formation Maintenance Reward
         
@@ -1153,9 +1158,9 @@ class FormationGateTraversal(IsaacEnv):
         
         # 2.2 Formation cohesion bonus - reward for keeping drones close together
         pairwise_distances = torch.cdist(drone_pos, drone_pos)
-        pairwise_distances = pairwise_distances + torch.eye(self.drone.n, device=self.device) * 1000
+        pairwise_distances = pairwise_distances + torch.eye(self.drone.n, device=self.device)
         avg_inter_drone_distance = pairwise_distances.mean(dim=(-2, -1))
-        reward_cohesion = torch.exp(-avg_inter_drone_distance * 0.3) * 0.5
+        reward_cohesion = torch.exp(-avg_inter_drone_distance * 0.3) * self.formation_cohesion_weight
         
         # 3. Gate Traversal Rewards
         
@@ -1168,21 +1173,27 @@ class FormationGateTraversal(IsaacEnv):
         current_gate_pos = self.gate_positions[env_indices, self.current_gate_idx.clamp(0, self.gate_count-1)]  # [num_envs, 3]
         gate_active = valid_gate_mask  # [num_envs]
         
-        # Distance to current gate
-        gate_distance = torch.norm(formation_center - current_gate_pos, dim=-1)
+        # Distance to current gate - 修改为每个无人机到门的距离和
+        # 计算每个无人机到当前门的距离 [num_envs, n_drones]
+        individual_gate_distances = torch.norm(drone_pos - current_gate_pos.unsqueeze(1), dim=-1)
+        # 计算每个环境中所有无人机到门距离的总和 [num_envs]
+        gate_distance_sum = individual_gate_distances.sum(dim=-1)
         
-        # Progressive approach reward: exponential decay with distance
+        # 保持原有的编队中心距离计算，用于其他奖励
+        gate_distance_center = torch.norm(formation_center - current_gate_pos, dim=-1)
+
+        # Progressive approach reward: exponential decay with distance (使用编队中心距离)
         reward_gate_approach = torch.where(
             gate_active,
-            gate_distance * self.gate_reward_weight,
-            torch.zeros_like(gate_distance)
+            gate_distance_center * self.gate_reward_weight,
+            torch.zeros_like(gate_distance_center)
         )
-        
+
         # 3.2 Gate alignment reward - reward for approaching gate from correct direction
         gate_direction = current_gate_pos - formation_center
         gate_direction_norm = gate_direction / (torch.norm(gate_direction, dim=-1, keepdim=True).clamp_min(1e-6))
         formation_velocity_norm = avg_velocity / (torch.norm(avg_velocity, dim=-1, keepdim=True).clamp_min(1e-6))
-        
+
         gate_alignment = torch.sum(formation_velocity_norm * gate_direction_norm, dim=-1)
         reward_gate_alignment = torch.where(
             gate_active,
@@ -1190,26 +1201,25 @@ class FormationGateTraversal(IsaacEnv):
             torch.zeros_like(gate_alignment)
         )
         
-        # 3.3 Gate progress reward based on distance improvement
+        # 3.3 Gate progress reward based on distance improvement - 修改为基于所有无人机距离和的改进
         # Only calculate and update for environments with active gates
         reward_gate_progress = torch.zeros(self.num_envs, device=self.device)
         if gate_active.any():
             active_envs = torch.where(gate_active)[0]
-            active_gate_distance = gate_distance[active_envs]
-            active_last_distance = self.last_gate_distance[active_envs]
+            # 使用所有无人机到门距离的总和
+            active_gate_distance_sum = gate_distance_sum[active_envs]
+            active_last_distance_sum = self.last_gate_distance[active_envs]
             
-            # Calculate progress only for active environments
-            active_progress = active_last_distance - active_gate_distance
+            # Calculate progress based on sum of individual drone distances
+            active_progress = active_last_distance_sum - active_gate_distance_sum
             # print("gate active envs:", gate_active)
             # print("active envs:", active_envs)
-            # print("Active gate progress:", active_progress)
+            # print("Active gate progress (sum):", active_progress)
             # print("self gate reward weight:", self.gate_reward_weight)
             reward_gate_progress[active_envs] = active_progress * self.gate_reward_weight
             
-            # Update last distance only for active environments
-            self.last_gate_distance[active_envs] = active_gate_distance
-        
-        # 4. Endpoint Progress Rewards
+            # Update last distance sum for active environments
+            self.last_gate_distance[active_envs] = active_gate_distance_sum        # 4. Endpoint Progress Rewards
         
         # 4.1 Calculate individual drone distances to their target endpoints
         individual_endpoint_distances = torch.norm(drone_pos - self.end_positions, dim=-1)  # [num_envs, n_drones]
@@ -1225,10 +1235,27 @@ class FormationGateTraversal(IsaacEnv):
         reward_endpoint_velocity = velocity_toward_endpoint * self.endpoint_progress_reward_weight
         
         # 4.4 Endpoint progress reward based on sum of individual distance improvements
-        last_total_distance = self.last_endpoint_distances.sum(dim=-1)  # [num_envs]
-        endpoint_progress = last_total_distance - total_endpoint_distance  # [num_envs]
-        reward_endpoint_progress = endpoint_progress * self.endpoint_progress_reward_weight 
-        self.last_endpoint_distances = individual_endpoint_distances.clone()
+        # 修改：参考reward_gate_progress的实现，只有穿过所有门之后才开始计算endpoint progress
+        # Check which environments have passed all gates
+        all_gates_passed_mask = self.gates_passed >= self.gate_count  # [num_envs]
+        
+        reward_endpoint_progress = torch.zeros(self.num_envs, device=self.device)
+        if all_gates_passed_mask.any():
+            # Only calculate and update for environments that have passed all gates
+            endpoint_active_envs = torch.where(all_gates_passed_mask)[0]
+            
+            # Get last endpoint distance sum for active environments
+            last_total_distance_active = self.last_endpoint_distances[endpoint_active_envs].sum(dim=-1)  # [active_envs]
+            current_total_distance_active = total_endpoint_distance[endpoint_active_envs]  # [active_envs]
+            
+            # Calculate progress based on sum of individual distance improvements
+            endpoint_progress_active = last_total_distance_active - current_total_distance_active  # [active_envs]
+            reward_endpoint_progress[endpoint_active_envs] = endpoint_progress_active * self.endpoint_progress_reward_weight
+            
+            # Update last endpoint distances only for active environments
+            self.last_endpoint_distances[endpoint_active_envs] = individual_endpoint_distances[endpoint_active_envs]
+        
+        # 对于还没有穿过所有门的环境，保持last_endpoint_distances不变，不计算endpoint progress奖励
         
         # 4.5 Formation endpoint alignment - all drones should reach their target positions
         reward_endpoint_formation = torch.exp(-individual_endpoint_distances.mean(dim=-1) * 0.3) * self.endpoint_progress_reward_weight * 0.3
@@ -1237,18 +1264,18 @@ class FormationGateTraversal(IsaacEnv):
         
         # 5.1 Inter-drone collision penalty
         min_distances = pairwise_distances.min(dim=-1)[0].min(dim=-1)[0]
-        reward_collision_penalty = torch.where(
-            min_distances < self.safe_distance,
-            -self.collision_penalty_weight,
-            torch.zeros_like(min_distances)
-        )
+        # reward_collision_penalty = torch.where(
+        #     min_distances < self.safe_distance,
+        #     -self.collision_penalty_weight,
+        #     torch.zeros_like(min_distances)
+        # )
         
-        # 5.2 Soft collision avoidance - gradual penalty as drones get closer
-        reward_soft_collision_penalty = torch.where(
-            min_distances < self.safe_distance * 2.0,
-            -0.5 * torch.exp(-(min_distances - self.safe_distance)),
-            torch.zeros_like(min_distances)
-        )
+        # # 5.2 Soft collision avoidance - gradual penalty as drones get closer
+        # reward_soft_collision_penalty = torch.where(
+        #     min_distances < self.safe_distance * 2.0,
+        #     -0.5 * torch.exp(-(min_distances - self.safe_distance)),
+        #     torch.zeros_like(min_distances)
+        # )
         
         # 6. Task Completion Bonuses
         
@@ -1263,12 +1290,13 @@ class FormationGateTraversal(IsaacEnv):
             valid_gate_indices = self.current_gate_idx[valid_envs]
             valid_gate_pos = self.gate_positions[valid_envs, valid_gate_indices]  # [valid_envs, 3]
             valid_center_pos = formation_center[valid_envs]  # [valid_envs, 3]
-            valid_gate_distance = gate_distance[valid_envs]  # [valid_envs]
+            # 使用编队中心距离进行门穿越检测
+            valid_gate_center_distance = gate_distance_center[valid_envs]  # [valid_envs]
             
             # Check if formation center has passed through the gate
             gate_threshold = max(self.gate_width, self.gate_height)
             passed_x = valid_center_pos[:, 0] > valid_gate_pos[:, 0]  # [valid_envs]
-            close_enough = valid_gate_distance < gate_threshold  # [valid_envs]
+            close_enough = valid_gate_center_distance < gate_threshold  # [valid_envs]
             traversal_mask = passed_x & close_enough  # [valid_envs]
             
             if traversal_mask.any():
@@ -1299,8 +1327,7 @@ class FormationGateTraversal(IsaacEnv):
             reward_formation + reward_cohesion +
             
             # Gate traversal rewards
-            # reward_gate_progress + reward_gate_traversal +
-            reward_gate_traversal + 
+            reward_gate_progress + reward_gate_traversal +
             
             # Endpoint progress rewards
             reward_endpoint_progress +
@@ -1322,7 +1349,7 @@ class FormationGateTraversal(IsaacEnv):
         terminated = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         
         # Critical collision
-        collision_terminated = min_distances < 0.5
+        collision_terminated = min_distances < 0.05
         
         # Formation breakdown - more lenient threshold for direct learning
         # Use formation_cost as a measure of formation breakdown
@@ -1422,7 +1449,7 @@ class FormationGateTraversal(IsaacEnv):
         endpoint_exceeded = any_drone_too_far & any_drone_passed_endpoint_x
 
         # terminated = collision_terminated | formation_breakdown | success | out_of_bounds | gate_bypass_failure | endpoint_exceeded
-        terminated = success | out_of_bounds | endpoint_exceeded
+        terminated = collision_terminated | success | out_of_bounds | gate_bypass_failure | endpoint_exceeded
 
         # ==================== STATS UPDATE ====================
         truncated = self.progress_buf >= self.max_episode_length
@@ -1442,8 +1469,8 @@ class FormationGateTraversal(IsaacEnv):
         self.stats["reward_gate_progress"] += reward_gate_progress.unsqueeze(-1)
         
         # Safety reward components
-        self.stats["reward_collision_penalty"] += reward_collision_penalty.unsqueeze(-1)
-        self.stats["reward_soft_collision_penalty"] += reward_soft_collision_penalty.unsqueeze(-1)
+        # self.stats["reward_collision_penalty"] += reward_collision_penalty.unsqueeze(-1)
+        # self.stats["reward_soft_collision_penalty"] += reward_soft_collision_penalty.unsqueeze(-1)
         
         # Task completion reward components
         self.stats["reward_completion"] += reward_completion.unsqueeze(-1)

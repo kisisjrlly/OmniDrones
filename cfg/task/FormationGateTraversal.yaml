@@ -7,12 +7,13 @@ defaults:
   # - /base/randomization_base@_here_
 
 env:
-  num_envs: 256
-  max_episode_length: 150
+  num_envs: 1024
+  max_episode_length: 480
 
 drone_model:
   name: Hummingbird
-  controller: LeePositionController
+  # controller: RateController  # No low-level controller, direct motor control
+  controller: RateController
 
 # Task-specific parameters
 time_encoding: False
@@ -34,12 +35,13 @@ direct_learning:
   enable: true
 
 # Reward weights (only parameters actually used in the code)
-formation_reward_weight: 3.0           # 编队保持奖励
-gate_reward_weight: 2.0                # 门穿越相关奖励
-collision_penalty_weight: 8.0          # 碰撞惩罚
-endpoint_progress_reward_weight: 100    # 终点进度奖励
-uprightness_reward_weight: 3.0         # 机身姿态保持奖励
-reward_action_smoothness_weight: 0.5   # 动作平滑性奖励
+formation_reward_weight: 0.0           # 编队保持奖励
+formation_cohesion_weight: 0.0         # 编队内聚力奖励
+gate_reward_weight: 40.0                # 门穿越相关奖励
+collision_penalty_weight: 0.0          # 碰撞惩罚
+endpoint_progress_reward_weight: 6    # 终点进度奖励
+uprightness_reward_weight: 16.0         # 机身姿态保持奖励
+reward_action_smoothness_weight: 0   # 动作平滑性奖励
 # Formation configuration
 # formation: tight_3  # Options: tight, wide, v_shape, tight_3, v_shape_3
 formation: v_shape_3

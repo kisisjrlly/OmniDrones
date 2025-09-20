@@ -12,7 +12,7 @@ env:
 
 drone_model:
   name: Iris
-  controller: LeePositionController
+  controller: RateController
 
 time_encoding: true
 

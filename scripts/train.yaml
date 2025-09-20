@@ -24,6 +24,7 @@ seed: 0
 # checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250901_225024-c5y2joqs/files/checkpoint_32800768.pt
 # checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250902_175845-c9vtdwjl/files/checkpoint_22970368.pt
 # checkpoint_path: /home/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250909_204627-ax1gmuvu/files/checkpoint_13139968.pt
+checkpoint_path: /home/siclab/zhaoguodong/work/code/MAPPO-MPC-OmniDrones/OmniDrones/scripts/wandb/run-20250919_215950-9avw48ik/files/checkpoint_648871936.pt
 viewer:
   resolution: [960, 720]
   eye: [10, 0., 8.]
